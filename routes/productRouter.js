@@ -14,9 +14,9 @@ router.get("/all", async(req,res)=>{
 })
 
 router.get("/", async(req,res)=>{
-    const searchQuery = req.body
+    const searchId = req.query._id
     try{
-        const products = await Product.find(searchQuery);
+        const products = await Product.find({_id:searchId});
         res.status(200).json(products[0])
     } catch (error) {
         console.error(error);
@@ -35,10 +35,10 @@ router.post("/", async(req,res)=>{
     )
     try{
         const savedProduct = await product.save();
-        res.status(201).json(savedProduct)
+        res.status(201).json({ message: "Successfully Added Product",payload: savedProduct})
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Internal Server Error" });
+        res.status(500).json({ message: "Internal Server Error" });
     }
 })
 
@@ -46,7 +46,7 @@ router.put("/", async (req, res) => {
     const productInput = req.body;
     try {
         const updatedProduct = await Product.findByIdAndUpdate(productInput._id, productInput, { new: true });
-        res.status(200).json(updatedProduct)
+        res.status(200).json({ message: "Successfully Updated Product",payload: updatedProduct})
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Internal Server Error" });

@@ -1,10 +1,8 @@
 const express = require("express")
 const {Admin}= require("../models/Admin.js");
 const {hash,hashCheck}= require("../utils/encryption.js");
-const jwt = require('jsonwebtoken');
 
 const router = express.Router()
-const secret = process.env.JWT_SECRET;
 
 router.get("/all", async(req,res)=>{
     try{
@@ -27,13 +25,32 @@ router.get("/", async(req,res)=>{
     }
 })
 
+router.post("/login", async (req,res) =>{
+    const _id = req.body._id;
+    const password = req.body.password;
+    
+    const admins= await Admin.find({_id:_id});
+
+    if(admins.length==0){
+        res.status(400).json({ message: "Incorrect Credentials" });
+    }else{
+        const currentAdmin =admins[0]
+        const loginSuccess = await hashCheck(password,currentAdmin.password)
+        if(loginSuccess){
+            res.status(200).json({ message: "",_id:currentAdmin._id });
+        }else{
+            res.status(400).json({ message: "Incorrect Credentials" });
+        }
+    }
+})
+
 router.post("/",async (req,res) =>{
     const adminInput = req.body
 
     const admins= await Admin.find({_id:adminInput._id});
 
     if(admins.length>0){
-        res.status(200).json({ error: "Username Taken" });
+        res.status(200).json({ message: "Username Taken" });
     }else{
         const hashedPassword = await hash(adminInput.password);
         let admin = new Admin(
@@ -46,9 +63,36 @@ router.post("/",async (req,res) =>{
             }
         )
         await admin.save();
-        res.status(200).json({ success: "Admin added" });
+        res.status(200).json({ message: "Successfully Added Admin" });
     }
 })
+
+router.put("/", async (req, res) => {
+    const adminInput = req.body;
+    
+    try {
+        const admins= await Admin.find({_id:adminInput._id});
+        if(admins.length==0){
+            res.status(200).json({ message: "Could not verify identity" });
+        }else{
+            const currentAdmin =admins[0]
+            const loginSuccess = await hashCheck(adminInput.password,currentAdmin.password)
+            if(loginSuccess){
+                const hashedPassword = await hash(adminInput.newPassword);
+                currentAdmin.password = hashedPassword
+                const updatedAdmin = await Admin.findByIdAndUpdate(adminInput._id, currentAdmin, { new: true });
+                res.status(200).json({ message: "Password change Successful" , payload:updatedAdmin })
+            }else{
+                res.status(200).json({ message: "Wrong Password" });
+            }
+        }
+        
+        
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
 
 router.delete("/", async (req, res) => {
     const deleteQuery = req.query
@@ -60,37 +104,5 @@ router.delete("/", async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
-
-router.post("/login", async (req,res) =>{
-    const username = req.body.username;
-    const password = req.body.password;
-    let isError = false
-    if(username==""){
-        message.usernameError = "Username is empty. Try again."
-        isError = true
-    }
-    if(password==""){
-        message.passwordError = "Password is empty. Try again."
-        isError = true
-    }
-    $users= await User.find({username:username});
-
-    if($users.length==0){
-        message.passwordError = "No user exists with given username. Please register."
-        res.render("user/login",{message})
-    }else{
-        const currentUser =$users[0]
-        const loginSuccess = await hashCheck(password,currentUser.password)
-        if(loginSuccess){
-            const token = jwt.sign({username: req.body.username}, secret, { expiresIn: '1h' });
-            req.session.username = username;
-            req.session.token = token
-            res.redirect("/user/dashboard")
-        }else{
-            message.passwordError = "Incorrect password."
-            res.render("user/login",{message})
-        }
-    }
-})
 
 module.exports = router
